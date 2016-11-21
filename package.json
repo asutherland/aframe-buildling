@@ -1,0 +1,20 @@
+{
+  "name": "aframe-buildling-component",
+  "description": "Simple, Shoddy Procedural Building Generation Component",
+  "version": "0.1.0",
+  "license": "Apache 2.0",
+  "scripts": {
+    "start": "budo --live --verbose --port 3000 --open",
+    "deploy": "ghpages",
+    "ghpages": "ghpages"
+  },
+  "devDependencies": {
+    "budo": "^7.0.0",
+    "ghpages": "0.0.3"
+  },
+  "keywords": [
+    "aframe",
+    "webvr",
+    "vr"
+  ]
+}
