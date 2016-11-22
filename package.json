@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "license": "Apache 2.0",
   "scripts": {
-    "start": "budo --live --verbose --port 3000 --open",
+    "start": "budo --live --verbose --port 3000",
     "deploy": "ghpages",
     "ghpages": "ghpages"
   },
@@ -16,5 +16,8 @@
     "aframe",
     "webvr",
     "vr"
-  ]
+  ],
+  "dependencies": {
+    "aframe": "^0.3.2"
+  }
 }
