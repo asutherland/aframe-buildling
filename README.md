@@ -9,23 +9,24 @@ should go.
 Buildings are allocated space via the "blocks" property.
 
 The blocks are integer-quantized voxels, with the block at 0 0 0 sitting
-on top of the y=0 plane, centered around the +y axis.  These blocks are
-notionally 6ft cubes if you're American, or 2m cubes usually thought of
-in 1/3 of a meter increments if you're not.  They are units of space
+on top of the y=0 plane, centered around the +y axis.  While configurable, these
+blocks are intended to have the same dimensions in both horizontal directions,
+about ~6ft, and a vertical height corresponding to a single building floor,
+defaulting to 8ft, but 10ft also being possible.  They are units of space
 allocation not a geometry alignment grid.
 
-The choice of 6ft is made because:
+The choice of 6ft horizontally is made because:
 - It's a large enough value to contain a 3ft wide door.
-- Double-height is enough for a 7ft high door, 1ft of clearance, then
- 4ft of roof.
 - Some other multiples where a house 3 voxels wide can have a reasonable
  buffer on ths sides (2ft each) plus windows with reasonable spacing
  between the door.
 - 6ft works for a 2-lane pedestrian path.
 
-For now, buildings have 8ft floors.  For houses with sloped rooves, uninhabited
-rooves need at least 4ft of clearance.  Inhabited rooves like with dormers can
-do with only 2ft of extra height.
+Previously, cubic voxels were considered, with 6ft height being used so that
+the leftovers could be used for sloping roofs.  However, we're not doing
+sloping rooves initially, and the floor-slicing process becomes needlessly
+complex in that case.  It's easy enought to just have the top set of blocks
+be allocated to roof-space that need not use up the entire vertical allocation.
 
 ### Building Construction ###
 
@@ -33,16 +34,38 @@ Construction proceeds floor by floor in multiple passes.
 
 #### 1: Floor Slicing ####
 
-In the first pass, floor space is allocated where voxels at the current floor
-height exist and have an available voxel above fulfilling the rest of the
-vertical space needs.  An 2d block space representation is derived to provide a
-marching "squares" type representation where anywhere between 1 and 4 path
-segments are desired for each square based on the number of exposed faces.  This
-is done for all floors.
+In the first pass, we find groups of blocks connected via North/East/South/West
+2d relationships for each "floor" (distinct y value).  Informed by THREE.js'
+XZ ground plane where +Z is coming at the camera and +X goes off to the right,
+we declare north to be -Z and east to be +X.
 
-#### 2: Face Planning ####
+For each of these groups we compute a "VoxFace" representation.  VoxFaces are
+about responsibility for generating walls; they do not describe actual geometry.
 
-During the second pass, face-planners are provided with all the floor space
+VoxFaces have types: north, northeast corner, east, southeast corner, south,
+southwest corner, west, and northwest corner.  A "north" voxface indicates a
+responsibility to generate a wall path that is connected to the "west" and
+"east" sides of the block somewhere.  Such a wall inherently be north-facing,
+which is why we name it a north voxface, but it doesn't need to be a perfectly
+flat wall flush with the north boundary of the block or parallel to it.  The
+west and east points can be anywhere along the west or east sides of the block.
+
+Similarly, a northeast corner is a responsibility to generate a wall the starts
+on the west side of the block and ends on the south side.  We define things this
+way so that there is a clear owner responsible for determining how the corner
+geometry should work.  If we generated separate north and east voxfaces then
+we'd need some way for the separate owners to decide a common point for the
+corner, etc.
+
+What about "island" or "peninsula" cases where there are 0 or 1 adjacent blocks
+on the current floor?  Oh right, those.  Yeah, they get their own types too:
+island, north cape, east cape, south cape, west cape.  Why cape?  It turns out
+those are basically peninsulas, but are much easier to type!  So a north cape
+is a block only connected to its south (in 2d).
+
+#### 2: VoxFace Planning ####
+
+During the second pass, voxface-planners are provided with all the floor space
 slices and can claim and annotate specific faces.  This allows for the creation
 of architectural features that span multiple floors or for the application of
 building-scale designs and patterns.
@@ -67,7 +90,7 @@ closed curve, we will produce 4 WPSCP's.
 
 The "pair" comes from the planner producing a curve for both the bottom and top
 of the wall AKA floor and ceiling.  And "curve" is also somewhat of a misnomer,
-because it's really 1 "curve" per block space face that the WPSCP touches.  (A
+because it's really 1 "curve" per cell-space face that the WPSCP touches.  (A
 block face may be referenced by multiple WPSCP's; it would not be surprising
 for a corner to consist of 2 plannable WPSCP's joined by a 3rd unplannable
 WPSCP.)
