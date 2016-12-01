@@ -1,3 +1,6 @@
+/**
+ * See docs/LAYOUT.md for context.
+ **/
 
 /**
  * VoxFace types.
@@ -28,19 +31,32 @@ function VoxFace(owningBlock, faceType) {
   // after floor slicing.
   this.prevFace = null;
 
+  /* TODO
   // Any matching face (same faceType) for the floor above us, may stay null.
   this.upFace = null;
   // Any matching face (same faceType) for the floor below us, may stay null.
   this.downFace = null;
+  */
+
+  this.wallPlanner = null;
+  this.wallData = null;
 }
 VoxFace.prototype = {
-
 }
 
 /**
- * A mapping from an adjacency bitmask to the list of voxface types that should
- * exist in that scenario.  Our adjacency bitmask is: north (1), east(2),
- * south(4), west(8).
+ * A mapping from an adjacency bitmask to the list of VoxFace types that should
+ * exist in that scenario.  Because we define voxfaces as a responsibility to
+ * generate a continuous path to specific edge of the associated VoxBlock which
+ * may involve corners/180-degree turns, the only time we'll have more than 1
+ * is for parallel voxfaces.  These will always be parallel-ish [N,S] or [E,W]
+ * pairs.  Something like a [NE,SW] pair is impossible because these are corners
+ * and such a combination is what we define to be a VFT_ISLAND.
+ *
+ * Our adjacency bitmask is: north (1), east(2), south(4), west(8).
+ *
+ * Do not change the ordering of the E/W N/S pairs without updating
+ * `_linkVoxFace`.
  */
 var ADJ_TO_VFT_MAPPING = [
   [VFT_ISLAND], // nothing adjacent! island!
@@ -61,6 +77,68 @@ var ADJ_TO_VFT_MAPPING = [
   null // 15=1+2+4+8: all sides, no faces generated and should never be indexed.
 ];
 
+// see VFT_CLOCKWISE_ENTRY_FACE_INDEX_MAPPING
+var NE_ENTRY = 0;
+var SE_ENTRY = 1;
+var SW_ENTRY = 2;
+var NW_ENTRY = 3;
+var SELF_LOOP = 4;
+
+/**
+ * Maps from VoxFace type to the corner of entry into the next/adjacent block
+ * from that block's perspective.  If there's a "deflection", then you need
+ * to further map the entry through CLOCKWISE_ENTRY_CORNER_DEFLECT_ROTATE.
+ */
+var VFT_CLOCKWISE_ENTRY_FACE_INDEX_MAPPING = [
+  // cardinal + corners
+  NW_ENTRY, // N enters from the west to the north
+  NE_ENTRY, // NE corner enters from the north to the east
+  NE_ENTRY, // E enters from the north to the east
+  SE_ENTRY, // SE corner enters from the east to the south
+  SE_ENTRY, // S enters from the east to the south
+  SW_ENTRY, // SW enters from the south to the west
+  SW_ENTRY, // W enters frmo the south to the west
+  NW_ENTRY, // NW enters from the west to the north
+  // capes
+  NE_ENTRY, // N cape enters from the north to the east
+  SE_ENTRY, // E cape enters from the east to the south
+  SW_ENTRY, // S cape enters from the south to the west
+  NW_ENTRY, // W cape enters from the west to the north
+  // island (is special) and omitted because you shouldn't ask.
+];
+
+/**
+ * All clockwise entries are unambiguous because they're always left turns, so
+ * we can trivially rotate them without direction.  Keep in mind we're
+ * discussing _entry_ corners here, not exit corners.  Unlike some other
+ * mappings that need to exist because of our value-space (ex: MA_U/MA_D), this
+ * could be accomplished with math.
+ */
+var CLOCKWISE_ENTRY_CORNER_DEFLECT_ROTATE = [
+  NW_ENTRY, // Our NE is our eastern neighbor's NW (0 => 3)
+  NE_ENTRY, // Our SE is our southern neighbor's NE (1 => 0)
+  SE_ENTRY, // Our SW is our western neighbor's SE (2 => 1)
+  SW_ENTRY, // our NW is our norther neighbor's SW (3 => 2)
+]
+
+var VFT_CLOCKWISE_EXIT_DIR_MAPPING = [
+  // cardinal + corners
+  MA_E, // N exits east
+  MA_S, // NE corner exits south
+  MA_S, // E exits south
+  MA_W, // SE corner exits west
+  MA_W, // S exits west
+  MA_N, // SW exits north
+  MA_N, // W exits north
+  MA_E, // NW corner exits east
+  // capes
+  MA_S, // N cape both enters and exits from the south
+  MA_W, // E cape both enters and exits from the west
+  MA_N, // S cape both enters and exits from the north
+  MA_E, // W cape both enters and exits from the east
+  // island (is special) and omitted because you shouldn't ask.
+];
+
 /**
  *
  */
@@ -78,6 +156,10 @@ FloorSlicer.prototype = {
     }
   },
 
+  /**
+   * Using the ADJ_TO_VFT_MAPPING lookup table, create the (1 or 2) VoxFaces
+   * for this block.  Linkage occurs in `_linkVoxFace`.
+   */
   _createFacesForBlock: function(block) {
     // north (1), east (2), south (4), west (8)
     var adjacencyBits = (
@@ -87,6 +169,73 @@ FloorSlicer.prototype = {
      (block.adjacentBlocks[4] ? 8 : 0));
 
     var faceTypes = ADJ_TO_VFT_MAPPING[adjacencyBits];
+    var voxFaces = block.voxFaces = [];
+    for (var iFaceType = 0; iFaceType < faceTypes.length; iFaceType++) {
+      var faceType = faceTypes[iFaceType];
+
+      var face = new VoxFace(block, faceType);
+      voxFaces.push(face);
+    }
+  },
+
+  /**
+   * Given a starting face, establish the nextFace/prevFace links by walking in
+   * clock-wise ("next") traversal order.  Returns the face to use as the
+   * voxface to put in Group2d.startVoxFaces.  Right now that's just the first
+   * face we're provided, but in the future we might want to adjust that for
+   * some kind of consistency.
+   *
+   * All our VoxFaces are defined such that they notionally enter/exit a block
+   * at a corner via a specific cardinal direction.  If we didn't have
+   * internal blocks, it would be simple enough to figure out the adjacent block
+   * we're traversing into and which of its (1 or 2) voxfaces the link should be
+   * with based on those voxfaces' types.  However, we do have internal blocks
+   * and they mean that we actually want to hang a 90-degree left when we hit
+   * an internal block which means rotating things.
+   */
+  _linkVoxFace: function(firstFace) {
+    var face = firstFace, nextFace;
+    for (var face = firstFace, nextFace = null;
+         nextFace != firstFace; face = nextFace) {
+      var block = face.block;
+
+      var traverseDir = VFT_CLOCKWISE_EXIT_DIR_MAPPING[face.faceType];
+      var nextBlock = block.adjacentBlocks[traverseDir];
+      var entryCorner = VFT_CLOCKWISE_ENTRY_FACE_INDEX_MAPPING[face.faceType];
+
+      // Is this an internal block?  (voxFaces never gets set in that case.)
+      if (!nextBlock.voxFaces) {
+        // Then hang a left and traverse again.
+        traverseDir = MANHATTAN_LEFT_MAPPING[traverseDir];
+        nextBlock = nextBlock.adjacentBlocks[traverseDir];
+        entryCorner = CLOCKWISE_ENTRY_CORNER_DEFLECT_ROTATE[entryCorner];
+      }
+
+      var nextFaces = nextBlock.voxFaces;
+      if (nextFaces.length > 1) {
+        // There are multiple faces, we gotta pick 1 based on entry.  This
+        // mapping assumes the current [E,W] and [N,S] orderings given to us by
+        // ADJ_TO_VFT_MAPPING.  We could rearrange things to be able to play
+        // bitmask games, but that won't make things more clear.
+        switch (entryCorner) {
+          case NE_ENTRY: // wants east (0)
+          case NW_ENTRY: // wants north (0)
+            nextFace = nextFaces[0];
+            break;
+          case SE_ENTRY: // wants south (1)
+          case SW_ENTRY: // wants west (1)
+            nextFace = nextFaces[1];
+            break;
+        }
+      } else {
+        nextFace = nextFaces[0];
+      }
+
+      face.nextFace = nextFace;
+      nextFace.prevFace = face;
+    }
+
+    return firstFace;
   },
 
   /**
@@ -102,8 +251,25 @@ FloorSlicer.prototype = {
         this._createFacesForBlock(block);
       }
     }
+
     // - Re-walk, establishing the links.
     // (We could have done it in the prior pass except for the edge-case about
-    // closure; with debugging factored in, it's easier this way.)
+    // closure.  However, this also makes it easier for us to determine the
+    // face-loops.  And with debugging factored in, it's easier this way.
+    // That said, this could be optimized at some expense of clarity.)
+    for (iBlock = 0; iBlock < group.blocks.length; iBlock++) {
+      var block = group.blocks[iBlock];
+
+      for (var iFace = 0; iFace < block.voxFaces.length; iFace++) {
+        var face = block.voxFaces[iFace];
+
+        // Not yet linked?
+        if (!face.nextFace) {
+          // Link its whose loop and add one of them to be a starting face.
+          group.startVoxFaces.push(this._linkVoxFace(face));
+        }
+      }
+    }
+
   }
 };

@@ -140,7 +140,7 @@ given a function findPlaceOnWallPiece(subT, h) that will provide the 3d
 position of the point on the wall segment.  (Where subT is [0, 1] over the
 placement range we're covering, and h is [0, 1] over the height of the wall.)
 
-#### 6: Floor and Ceiling Hacks ####
+#### 6: Floor and Ceiling Linkage (Hacks) ####
 
 Although sloped rooves are cool, they're also not trivial.  For now we do
 the simplest thing which is that we generate floor and ceiling slabs for every

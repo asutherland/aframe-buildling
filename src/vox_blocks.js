@@ -23,6 +23,19 @@ var MA_W = 4; // west
 var MA_D = 5; // down
 
 /**
+ * If we hang a left in this manhattan cardinal direction space, what's our new
+ * direction?
+ */
+var MANHATTAN_LEFT_MAPPING = [
+  MA_W, // north turns west
+  MA_N, // east turns north
+  MA_U, // left-up is still up
+  MA_E, // south turns east
+  MS_S, // west turns south
+  MA_D, // left-down is still down.
+]
+
+/**
  * Convert relative (Manhattan as in no-diagonals), coordinates to its adjacency
  * index.
  */
@@ -58,6 +71,19 @@ function VoxBlock(coord, coordStr, adjacentBlocks) {
   this.coord = coord;
   // stringified coord that's the key to the map we live in.
   this.coordStr = coordStr;
+
+  // north z-boundary
+  this.nZ = 0;
+  // east x-boundary
+  this.eX = 0;
+  // south z-boundary
+  this.sZ = 0;
+  // west x-boundary
+  this.wX = 0;
+  // floor y-boundary
+  this.floorY = 0;
+  // ceiling y-boundary
+  this.ceilY = 0;
 
   // north, east, up, south, west, down
   this.adjacentBlocks = adjacentBlocks;
@@ -116,6 +142,12 @@ function Group2d(id, y) {
   this.id = id;
   this.y = y;
   this.blocks = [];
+  /**
+   * List of (arbitrary) initial voxfaces for (closed) face-loop traversals.
+   * Each "courtyard" (fully enclosed void) will result in an an extra
+   * face-loop.
+   */
+  this.startVoxFaces = null;
 }
 Group2d.prototype = {
 };
