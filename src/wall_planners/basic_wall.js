@@ -1,3 +1,9 @@
+'use strict';
+
+var {
+  VFT_N, VFT_NE_CORN, VFT_E, VFT_SE_CORN, VFT_S, VFT_SW_CORN, VFT_W,
+  VFT_NW_CORN, VFT_N_CAPE, VFT_E_CAPE, VFT_S_CAPE, VFT_W_CAPE, VFT_ISLAND
+} = require('../floor_slicer');
 
 /**
  *  For now just does right-angle walls.
@@ -12,103 +18,115 @@ BasicWallPlanner.prototype = {
    * with the first and last curves merged with their neighbors.
    */
   _makeCurvesForFace: function(face) {
+    // The inset is always positive, so:
+    // z: -inset is moving north, +inset is moving south
+    // x: -inset is moving west, +inset is moving east
+    // So when manipulating:
+    // nZ: + inset
+    // eX: - inset
+    // sZ: - inset
+    // wX: + inset
     var inset = this.inset;
     var block = face.block;
     var p1, p2, p3, p4, p5;
 
+    // opposite rules from inset; nZ:-, eX:+, sZ+, wX:-
+    var inDeflect = face.prevDeflected ? inset : 0;
+    var outDeflect = face.nextDeflected ? inset : 0;
+
     // For our 2d purposes, z is y, so Vector2(x, z)
     switch (face.faceType) {
       case VFT_N:
-        p1 = new THREE.Vector2(block.wX, block.nZ - inset);
-        p2 = new THREE.Vector2(block.eX, block.nZ - inset);
+        p1 = new THREE.Vector2(block.wX - inDeflect, block.nZ + inset);
+        p2 = new THREE.Vector2(block.eX + outDeflect, block.nZ + inset);
         break;
 
       case VFT_NE_CORN:
-        p1 = new THREE.Vector2(block.wX, block.nZ - inset);
-        p2 = new THREE.Vector2(block.eX - inset, block.nZ - inset);
-        p3 = new THREE.Vector2(block.eX - inset, block.sZ);
+        p1 = new THREE.Vector2(block.wX - inDeflect, block.nZ + inset);
+        p2 = new THREE.Vector2(block.eX - inset, block.nZ + inset);
+        p3 = new THREE.Vector2(block.eX - inset, block.sZ + outDeflect);
         break;
 
       case VFT_E:
-        p1 = new THREE.Vector2(block.eX - inset, block.nZ);
-        p2 = new THREE.Vector2(block.eX - inset, block.sZ);
+        p1 = new THREE.Vector2(block.eX - inset, block.nZ - inDeflect);
+        p2 = new THREE.Vector2(block.eX - inset, block.sZ + outDeflect);
         break;
 
       case VFT_SE_CORN:
-        p1 = new THREE.Vector2(block.eX - inset, block.nZ);
+        p1 = new THREE.Vector2(block.eX - inset, block.nZ - inDeflect);
         p2 = new THREE.Vector2(block.eX - inset, block.sZ - inset);
-        p3 = new THREE.Vector2(block.wX, block.sZ - inset);
+        p3 = new THREE.Vector2(block.wX - outDeflect, block.sZ - inset);
         break;
 
       case VFT_S:
-        p1 = new THREE.Vector2(block.eX, block.sZ - inset);
-        p2 = new THREE.Vector2(block.wX, block.sZ - inset);
+        p1 = new THREE.Vector2(block.eX + inDeflect, block.sZ - inset);
+        p2 = new THREE.Vector2(block.wX - outDeflect, block.sZ - inset);
         break;
 
       case VFT_SW_CORN:
-        p1 = new THREE.Vector2(block.eX, block.sZ - inset);
-        p2 = new THREE.Vector2(block.wX - inset, block.sZ - inset);
-        p3 = new THREE.Vector2(block.wX - inset, block.nZ);
+        p1 = new THREE.Vector2(block.eX + inDeflect, block.sZ - inset);
+        p2 = new THREE.Vector2(block.wX + inset, block.sZ - inset);
+        p3 = new THREE.Vector2(block.wX + inset, block.nZ - outDeflect);
         break;
 
       case VFT_W:
-        p1 = new THREE.Vector2(block.wX - inset, block.sZ);
-        p2 = new THREE.Vector2(block.wX - inset, block.nZ);
+        p1 = new THREE.Vector2(block.wX + inset, block.sZ + inDeflect);
+        p2 = new THREE.Vector2(block.wX + inset, block.nZ - outDeflect);
         break;
 
       case VFT_NW_CORN:
-        p1 = new THREE.Vector2(block.wX - inset, block.sZ);
-        p2 = new THREE.Vector2(block.wX - inset, block.nZ - inset);
-        p3 = new THREE.Vector2(block.eX, block.nZ - inset);
+        p1 = new THREE.Vector2(block.wX + inset, block.sZ + inDeflect);
+        p2 = new THREE.Vector2(block.wX + inset, block.nZ + inset);
+        p3 = new THREE.Vector2(block.eX + outDeflect, block.nZ + inset);
         break;
 
       case VFT_N_CAPE:
-        p1 = new THREE.Vector2(block.wX - inset, block.sZ);
-        p2 = new THREE.Vector2(block.wX - inset, block.nZ - inset);
-        p3 = new THREE.Vector2(block.eX - inset, block.nZ - inset);
-        p4 = new THREE.Vector2(block.eX - inset, block.sZ);
+        p1 = new THREE.Vector2(block.wX + inset, block.sZ + inDeflect);
+        p2 = new THREE.Vector2(block.wX + inset, block.nZ + inset);
+        p3 = new THREE.Vector2(block.eX - inset, block.nZ + inset);
+        p4 = new THREE.Vector2(block.eX - inset, block.sZ + outDeflect);
         break;
 
       case VFT_E_CAPE:
-        p1 = new THREE.Vector2(block.wX, block.nZ - inset);
-        p2 = new THREE.Vector2(block.eX - inset, block.nZ - inset);
+        p1 = new THREE.Vector2(block.wX - inDeflect, block.nZ + inset);
+        p2 = new THREE.Vector2(block.eX - inset, block.nZ + inset);
         p3 = new THREE.Vector2(block.eX - inset, block.sZ - inset);
-        p4 = new THREE.Vector2(block.wX, block.sZ - inset);
+        p4 = new THREE.Vector2(block.wX - outDeflect, block.sZ - inset);
         break;
 
       case VFT_S_CAPE:
-        p1 = new THREE.Vector2(block.eX - inset, block.nZ);
+        p1 = new THREE.Vector2(block.eX - inset, block.nZ - inDeflect);
         p2 = new THREE.Vector2(block.eX - inset, block.sZ - inset);
-        p3 = new THREE.Vector2(block.wX - inset, block.sZ - inset);
-        p4 = new THREE.Vector2(block.wX - inset, block.nZ);
+        p3 = new THREE.Vector2(block.wX + inset, block.sZ - inset);
+        p4 = new THREE.Vector2(block.wX + inset, block.nZ - outDeflect);
         break;
 
       case VFT_W_CAPE:
-        p1 = new THREE.Vector2(block.eX, block.sZ - inset);
-        p2 = new THREE.Vector2(block.wX - inset, block.sZ - inset);
-        p3 = new THREE.Vector2(block.wX - inset, block.nZ - inset);
-        p4 = new THREE.Vector2(block.eX, block.nZ - inset);
+        p1 = new THREE.Vector2(block.eX + inDeflect, block.sZ - inset);
+        p2 = new THREE.Vector2(block.wX + inset, block.sZ - inset);
+        p3 = new THREE.Vector2(block.wX + inset, block.nZ + inset);
+        p4 = new THREE.Vector2(block.eX + outDeflect, block.nZ + inset);
         break;
 
       case VFT_ISLAND:
-        p1 = new THREE.Vector2(block.wX - inset, block.nZ - inset);
-        p2 = new THREE.Vector2(block.eX - inset, block.nZ - inset);
+        p1 = new THREE.Vector2(block.wX + inset, block.nZ + inset);
+        p2 = new THREE.Vector2(block.eX - inset, block.nZ + inset);
         p3 = new THREE.Vector2(block.eX - inset, block.sZ - inset);
-        p4 = new THREE.Vector2(block.wX - inset, block.sZ - inset);
+        p4 = new THREE.Vector2(block.wX + inset, block.sZ - inset);
         p5 = p1;
         break;
     }
 
     var curves = [];
-    curves.push(new LineCurve(p1, p2));
+    curves.push(new THREE.LineCurve(p1, p2));
     if (p3) {
-      curves.push(new LineCurve(p2, p3));
+      curves.push(new THREE.LineCurve(p2, p3));
     }
     if (p4) {
-      curves.push(new LineCurve(p3, p4));
+      curves.push(new THREE.LineCurve(p3, p4));
     }
     if (p5) {
-      curves.push(new LineCurve(p4, p5));
+      curves.push(new THREE.LineCurve(p4, p5));
     }
 
     return curves;
@@ -157,7 +175,7 @@ BasicWallPlanner.prototype = {
       while (iCurve < faceCurves.length - 1) {
         emitSegment();
         iCurve++;
-        segCurves.push(curves[iCurve]);
+        segCurves.push(faceCurves[iCurve]);
         segPointRanges.push(2, 2);
       }
     }
@@ -166,3 +184,5 @@ BasicWallPlanner.prototype = {
     return segments;
   }
 };
+
+module.exports =  { BasicWallPlanner };

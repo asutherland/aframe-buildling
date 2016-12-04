@@ -1,11 +1,12 @@
-require('./wall_planners/basic_wall');
+var { BasicWallPlanner } = require('./wall_planners/basic_wall');
 
 /**
  * For now we hard-code the use of the only wall-planner we have,
  * BasicWallPlanner.
  */
 function planFaces(space) {
-  var wallPlanner = new BasicWallPlanner();
+  var inset = space.hUnit / 5;
+  var wallPlanner = new BasicWallPlanner(inset);
 
   for (var iGroup = 0; iGroup < space.groups2dByY.length; iGroup++) {
     var group2d = space.groups2dByY[iGroup];
@@ -22,3 +23,5 @@ function planFaces(space) {
     }
   }
 }
+
+module.exports = { planFaces };

@@ -1,13 +1,14 @@
-
+'use strict';
 
 /**
- *
+ * For each 2d group, walk the faces and invoke wall planners so that they
+ * produce WPSCPs (wall-planning segment curve pairs).
  */
 function planWalls(space) {
-  var wallPlanner = new BasicWallPlanner();
-
   for (var iGroup = 0; iGroup < space.groups2dByY.length; iGroup++) {
     var group2d = space.groups2dByY[iGroup];
+
+    group2d.segments = [];
 
     for (var iFace = 0; iFace < group2d.startVoxFaces.length; iFace++) {
       var startFace = group2d.startVoxFaces[iFace];
@@ -47,7 +48,9 @@ function planWalls(space) {
 
         face = face.nextFace;
       } while (face !== startFace);
-      curPlanner.planRun(faceRun);
+      group2d.segments = group2d.segments.concat(curPlanner.planRun(faceRun));
     }
   }
 }
+
+module.exports = { planWalls };

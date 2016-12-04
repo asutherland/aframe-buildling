@@ -1,1 +1,1 @@
-require('src/component');
+require('./src/component');

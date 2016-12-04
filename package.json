@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "license": "Apache 2.0",
   "scripts": {
-    "start": "budo --live --verbose --port 3000",
+    "start": "budo --live --verbose --port 3000 examples/main.js:examples/build.js",
     "deploy": "ghpages",
     "ghpages": "ghpages"
   },

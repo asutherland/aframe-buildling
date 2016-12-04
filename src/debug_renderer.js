@@ -10,13 +10,30 @@ function renderDebugFloorLineMesh(space) {
 
   for (var iGroup = 0; iGroup < space.groups2dByY.length; iGroup++) {
     var group2d = space.groups2dByY[iGroup];
+    var floorY = group2d.blocks[0].floorY;
 
+    for (var iSeg = 0; iSeg < group2d.segments.length; iSeg++) {
+      var seg = group2d.segments[iSeg];
 
-    geometry.vertices.push(
-      new THREE.Vector3(vec3.x, vec3.y, vec3.z)
-    );
+      for (var iCurve = 0; iCurve < seg.floorCurves.length; iCurve++) {
+        var curve = seg.floorCurves[iCurve];
+        var minPoints = seg.pointRanges[iCurve*2];
+        var maxPoints = seg.pointRanges[iCurve*2 + 1];
+
+        var points = curve.getPoints(minPoints);
+        for (var iPoint = 0; iPoint < points.length; iPoint++) {
+          var point = points[iPoint];
+          geometry.vertices.push(
+            new THREE.Vector3(point.x, floorY, point.y)
+          );
+        }
+      }
+    }
   }
 
+  console.log('from space', space, 'we made', geometry.vertices.length, 'vertices');
 
-
+  return geometry;
 }
+
+module.exports = { renderDebugFloorLineMesh };

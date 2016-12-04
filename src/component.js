@@ -1,11 +1,18 @@
-require('./vox_blocks');
-require('./floor_slicer');
-require('./plan_faces');
-require('./plan_walls');
+'use strict';
+
+var { VoxBlockSpace } = require('./vox_blocks');
+var { FloorSlicer } = require('./floor_slicer');
+var { planFaces } = require('./plan_faces');
+var { planWalls } = require('./plan_walls');
+
+var { renderDebugFloorLineMesh } = require('./debug_renderer');
 
 var coordinates = AFRAME.utils.coordinates;
 
 var coordParser = function (value) {
+  if (Array.isArray(value)) {
+    return value;
+  }
   return value.split(',').map(coordinates.parse);
 };
 var coordStringifier = function (data) {
@@ -44,25 +51,30 @@ function asciiArtToBlockCoordMaps(str) {
   var x = xStart;
   var y = yStart;
   var z = zStart;
+  //console.log('ground floor upper left', x, y, z);
   for (var i = 0; i < str.length; i++) {
     var c = str.charCodeAt(i);
     switch (c) {
-      case 20: // whitespace => no block, +x
+      case 32: // whitespace => no block, +x
+        //console.log('whitespace', x, y, z);
         x++;
         break;
       case 46: // dot => emit block, +x
-        blocks.push({ x: x, y: y, z: z }); // (don't use cool syntax)
+        //console.log('dot', x, y, z);
+        blocks.push({ x, y, z });
         x++;
         break;
       case 124: // pipe => reset x, +y
         x = xStart;
         y++;
+        //console.log('pipe, now', x, y, z);
         break;
       case 10: // newline => eat one indenting space, reset x, reset y, +z
         i++; // eat the first space of the next line that's an indent artifact
         x = xStart;
         y = yStart;
         z++;
+        //console.log('newline, now', x, y, z);
         break;
     }
   }
@@ -93,16 +105,20 @@ AFRAME.registerComponent('buildling', {
     },
     */
     hScale: {
-      default: 0.1
+      default: 0.5
     },
     vScale: {
-      default: 0.2
+      default: 1
     }
   },
 
+  init: function() {
+
+  },
+
   update: function () {
-    var hUnit = this.data.hSize / 5;
-    var vUnit = this.data.vSize / 10;
+    var hUnit = this.data.hScale;// / 5;
+    var vUnit = this.data.vScale;// / 10;
 
     var blockSpace = new VoxBlockSpace(hUnit, vUnit);
     this.data.blocks.forEach(function(coord) {
@@ -121,11 +137,26 @@ AFRAME.registerComponent('buildling', {
 	      color: this.data.color
     });
 
-
     this.el.setObject3D('mesh', new THREE.Line(geometry, material));
   },
 
   remove: function () {
     this.el.removeObject3D('mesh');
+  }
+});
+
+/**
+ * <a-mountain>
+ */
+AFRAME.registerPrimitive('a-buildling', {
+  defaultComponents: {
+    buildling: {}
+  },
+
+  mappings: {
+    color: 'buildling.color',
+    blocks: 'buildling.blocks',
+    hScale: 'buildling.hScale',
+    vScale: 'buildling.vScale',
   }
 });

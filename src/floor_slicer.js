@@ -2,8 +2,28 @@
  * See docs/LAYOUT.md for context.
  **/
 
+var { MA_N, MA_E, MA_U, MA_S, MA_W, MA_D, MANHATTAN_LEFT_MAPPING } =
+  require('./vox_blocks');
+
 /**
  * VoxFace types.
+ *
+ * Note that we may need to add NE/SE/SW/NW deflection faces in the future to
+ * deal with the ramifications of insets.  Specifically, whenever our clockwise
+ * traversal finds it has to make a left-hand turn (so that there are 90 degrees
+ * of empty space, rather than when we hit a corner and there are 270 degrees
+ * of empty space), the two faces don't magically join without some help.
+ *
+ * Our options are:
+ * 1. Create a specific voxface type for this internal join.
+ * 2. Mark the deflections on the edge next/prev face links and leave it to the
+ *    wall-planner to special case the deflection.
+ *
+ * Currently we do the latter because when I sketched this all out in my head I
+ * was assuming the wall planner would be proactively aware of its adjacent
+ * faces and ensure the points terminate at the same spot.  While the planner
+ * will need to potentially do something like that in the future, the current
+ * deflection flags are good-ish enough.
  */
 var VFT_N = 0; // connect west and east block sides facing north.
 var VFT_NE_CORN = 1; // connect west and south block sides facing NE.
@@ -27,9 +47,13 @@ function VoxFace(owningBlock, faceType) {
   // Next face on our floor, clockwise (NESW-style).  Always present after
   // floor slicing.
   this.nextFace = null;
+  // Moving into the next face do we deflect off of a block?
+  this.nextDeflected = false;
   // Previous face on our floor, anti-clockwise (NESW-style).  Always present
   // after floor slicing.
   this.prevFace = null;
+  // Coming in from the previous face, was there a deflection off a block?
+  this.prevDeflected;
 
   /* TODO
   // Any matching face (same faceType) for the floor above us, may stay null.
@@ -74,7 +98,7 @@ var ADJ_TO_VFT_MAPPING = [
   [VFT_NE_CORN], // 12=4+8: to the south and west, so northeastern corner
   [VFT_E], // 13=1+4+8: to the north and south and west, so east face
   [VFT_N], // 14=2+4+8: to the east and south and west, so north face
-  null // 15=1+2+4+8: all sides, no faces generated and should never be indexed.
+  null // 15=1+2+4+8: all sides, no faces generated
 ];
 
 // see VFT_CLOCKWISE_ENTRY_FACE_INDEX_MAPPING
@@ -169,6 +193,10 @@ FloorSlicer.prototype = {
      (block.adjacentBlocks[4] ? 8 : 0));
 
     var faceTypes = ADJ_TO_VFT_MAPPING[adjacencyBits];
+    if (!faceTypes) {
+      return;
+    }
+
     var voxFaces = block.voxFaces = [];
     for (var iFaceType = 0; iFaceType < faceTypes.length; iFaceType++) {
       var faceType = faceTypes[iFaceType];
@@ -199,16 +227,29 @@ FloorSlicer.prototype = {
          nextFace != firstFace; face = nextFace) {
       var block = face.block;
 
+      // Islands involve no traversal.
+      if (face.faceType === VFT_ISLAND) {
+        face.nextFace = face;
+        face.prevFace = face;
+        break;
+      }
+
       var traverseDir = VFT_CLOCKWISE_EXIT_DIR_MAPPING[face.faceType];
       var nextBlock = block.adjacentBlocks[traverseDir];
       var entryCorner = VFT_CLOCKWISE_ENTRY_FACE_INDEX_MAPPING[face.faceType];
+      var leftDir = MANHATTAN_LEFT_MAPPING[traverseDir];
 
-      // Is this an internal block?  (voxFaces never gets set in that case.)
-      if (!nextBlock.voxFaces) {
+      // Do we deflect off this block?  We do so if there's something in its
+      // left direction.
+      var leftBlock = nextBlock.adjacentBlocks[leftDir];
+      var deflected;
+      if (leftBlock) {
         // Then hang a left and traverse again.
-        traverseDir = MANHATTAN_LEFT_MAPPING[traverseDir];
-        nextBlock = nextBlock.adjacentBlocks[traverseDir];
+        deflected = true;
+        nextBlock = leftBlock;
         entryCorner = CLOCKWISE_ENTRY_CORNER_DEFLECT_ROTATE[entryCorner];
+      } else {
+        deflected = false;
       }
 
       var nextFaces = nextBlock.voxFaces;
@@ -232,7 +273,9 @@ FloorSlicer.prototype = {
       }
 
       face.nextFace = nextFace;
+      face.nextDeflected = deflected;
       nextFace.prevFace = face;
+      nextFace.prevDeflected = deflected;
     }
 
     return firstFace;
@@ -246,10 +289,7 @@ FloorSlicer.prototype = {
     // - Walk the blocks, creating their faces.
     for (var iBlock = 0; iBlock < group.blocks.length; iBlock++) {
       var block = group.blocks[iBlock];
-      // Internal (2d) blocks have no faces!
-      if (!block.isInternal2d) {
-        this._createFacesForBlock(block);
-      }
+      this._createFacesForBlock(block);
     }
 
     // - Re-walk, establishing the links.
@@ -259,6 +299,10 @@ FloorSlicer.prototype = {
     // That said, this could be optimized at some expense of clarity.)
     for (iBlock = 0; iBlock < group.blocks.length; iBlock++) {
       var block = group.blocks[iBlock];
+
+      if (!block.voxFaces) {
+        continue;
+      }
 
       for (var iFace = 0; iFace < block.voxFaces.length; iFace++) {
         var face = block.voxFaces[iFace];
@@ -272,4 +316,10 @@ FloorSlicer.prototype = {
     }
 
   }
+};
+
+module.exports = {
+  FloorSlicer,
+  VFT_N, VFT_NE_CORN, VFT_E, VFT_SE_CORN, VFT_S, VFT_SW_CORN, VFT_W,
+  VFT_NW_CORN, VFT_N_CAPE, VFT_E_CAPE, VFT_S_CAPE, VFT_W_CAPE, VFT_ISLAND
 };

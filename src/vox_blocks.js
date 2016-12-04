@@ -31,9 +31,9 @@ var MANHATTAN_LEFT_MAPPING = [
   MA_N, // east turns north
   MA_U, // left-up is still up
   MA_E, // south turns east
-  MS_S, // west turns south
+  MA_S, // west turns south
   MA_D, // left-down is still down.
-]
+];
 
 /**
  * Convert relative (Manhattan as in no-diagonals), coordinates to its adjacency
@@ -109,12 +109,12 @@ VoxBlock.prototype = {
    */
   get isInternal3d() {
     return (
-      this.adjacentBlocks[0] !== null &&
-      this.adjacentBlocks[1] !== null &&
-      this.adjacentBlocks[2] !== null &&
-      this.adjacentBlocks[3] !== null &&
-      this.adjacentBlocks[4] !== null &&
-      this.adjacentBlocks[5] !== null
+      this.adjacentBlocks[0] != null &&
+      this.adjacentBlocks[1] != null &&
+      this.adjacentBlocks[2] != null &&
+      this.adjacentBlocks[3] != null &&
+      this.adjacentBlocks[4] != null &&
+      this.adjacentBlocks[5] != null
     );
   },
 
@@ -123,10 +123,10 @@ VoxBlock.prototype = {
    */
   get isInternal2d() {
     return (
-      this.adjacentBlocks[0] !== null &&
-      this.adjacentBlocks[1] !== null &&
-      this.adjacentBlocks[3] !== null &&
-      this.adjacentBlocks[4] !== null
+      this.adjacentBlocks[0] != null &&
+      this.adjacentBlocks[1] != null &&
+      this.adjacentBlocks[3] != null &&
+      this.adjacentBlocks[4] != null
     );
   }
 };
@@ -147,7 +147,12 @@ function Group2d(id, y) {
    * Each "courtyard" (fully enclosed void) will result in an an extra
    * face-loop.
    */
-  this.startVoxFaces = null;
+  this.startVoxFaces = [];
+  /**
+   * Array of wall-planning segment curve pairs.  ("wpscps" is not a good
+   * variable name.)
+   */
+  this.segments = null;
 }
 Group2d.prototype = {
 };
@@ -159,12 +164,15 @@ Group2d.prototype = {
  * All implementation choices assume we're being used for a reasonably small
  * number of blocks that are largely connected.
  */
-function VoxBlockSpace() {
+function VoxBlockSpace(hUnit, vUnit) {
   /**
    * A mapping from coordinate-triple string to VoxBlock instance.  While
    * simplistic, our needs are simple too.
    */
   this._coordStrToBlock = new Map();
+
+  this.hUnit = hUnit;
+  this.vUnit = vUnit;
 
   this.groups3d = []; // index is id
   this.groups2d = []; // index is id
@@ -179,8 +187,13 @@ VoxBlockSpace.prototype = {
     return coordinates.stringify(coord);
   },
 
-  getExistingBlock: function(coord) {
-    var coordStr = this._makeCoordString(coord);
+  getExistingBlock: function(x, y, z) {
+    var coordStr;
+    if (arguments.length === 3) {
+      coordStr = x + ' ' + y + ' ' + z;
+    } else {
+      coordStr = this._makeCoordString(coord);
+    }
     return this._coordStrToBlock.get(coordStr);
   },
 
@@ -193,17 +206,25 @@ VoxBlockSpace.prototype = {
 
     // create the block
     block = new VoxBlock(
-      coord, coorStr,
-      // north, east, south, west, up, down
+      coord, coordStr,
+      // north, east, up south, west, down
       [
-        this.getExistingBlock(coord.x, coord.y, coord.z - 1),
-        this.getExistingBlock(coord.x + 1, coord.y, coord.z),
         this.getExistingBlock(coord.x, coord.y, coord.z + 1),
-        this.getExistingBlock(coord.x - 1, coord.y, coord.z),
+        this.getExistingBlock(coord.x + 1, coord.y, coord.z),
         this.getExistingBlock(coord.x, coord.y + 1, coord.z),
+        this.getExistingBlock(coord.x, coord.y, coord.z - 1),
+        this.getExistingBlock(coord.x - 1, coord.y, coord.z),
         this.getExistingBlock(coord.x, coord.y - 1, coord.z)
       ]
     );
+    var hUnit = this.hUnit, hHalfUnit = hUnit/2;
+    var vUnit = this.vUnit;
+    block.nZ = -hHalfUnit - hUnit * coord.z;
+    block.sZ = hHalfUnit - hUnit * coord.z;
+    block.eX = hHalfUnit + hUnit * coord.x;
+    block.wX = -hHalfUnit + hUnit * coord.x;
+    block.floorY = vUnit * coord.y;
+    block.ceilY = vUnit + vUnit * coord.y;
 
     var adjacencies = block.adjacentBlocks;
     // establish reciprocal adjacencies
@@ -213,8 +234,13 @@ VoxBlockSpace.prototype = {
       if (!other) {
         continue;
       }
-      recip.adjacentBlocks[reverseAdj] = block;
+      if (other.adjacentBlocks[reverseAdj]) {
+        throw new Error('trying to clobber existing?!');
+      }
+      other.adjacentBlocks[reverseAdj] = block;
     }
+
+    this._coordStrToBlock.set(coordStr, block);
   },
 
   _newGroup3d: function() {
@@ -227,13 +253,15 @@ VoxBlockSpace.prototype = {
     var group = new Group2d(this.groups2d.length + 1, y);
     this.groups2d.push(group);
     return group;
-  }
+  },
 
   /**
    * Simple non-recursive group flooding.
    */
   _flood3dGroup: function(rootBlock, group3d) {
     rootBlock.group3d = group3d;
+    group3d.blocks.push(rootBlock);
+
     // Invariant: any block with the group set has also had its adjacent blocks
     // pushed onto pending.  Therefore if we see a block with the group set,
     // we know we don't have anything to do.  Likewise, if the group has not
@@ -246,20 +274,24 @@ VoxBlockSpace.prototype = {
       if (!block) {
         continue;
       }
+
       // per invariant above, nothing to do here.
       if (block.group3d) {
         continue;
       }
+
       block.group3d = group3d;
+      group3d.blocks.push(block);
       pending.push(
-        rootBlock.adjacentBlocks[0], rootBlock.adjacentBlocks[1],
-        rootBlock.adjacentBlocks[2], rootBlock.adjacentBlocks[3],
-        rootBlock.adjacentBlocks[4], rootBlock.adjacentBlocks[5]);
+        block.adjacentBlocks[0], block.adjacentBlocks[1],
+        block.adjacentBlocks[2], block.adjacentBlocks[3],
+        block.adjacentBlocks[4], block.adjacentBlocks[5]);
     }
   },
 
-  _flood2dGroup: function(block, group2d) {
+  _flood2dGroup: function(rootBlock, group2d) {
     rootBlock.group2d = group2d;
+    group2d.blocks.push(rootBlock);
     // Invariant: any block with the group set has also had its adjacent blocks
     // pushed onto pending.  Therefore if we see a block with the group set,
     // we know we don't have anything to do.  Likewise, if the group has not
@@ -277,9 +309,10 @@ VoxBlockSpace.prototype = {
         continue;
       }
       block.group2d = group2d;
+      group2d.blocks.push(block);
       pending.push(
-        rootBlock.adjacentBlocks[0], rootBlock.adjacentBlocks[1],
-        rootBlock.adjacentBlocks[3], rootBlock.adjacentBlocks[4]);
+        block.adjacentBlocks[0], block.adjacentBlocks[1],
+        block.adjacentBlocks[3], block.adjacentBlocks[4]);
     }
   },
 
@@ -315,4 +348,10 @@ VoxBlockSpace.prototype = {
   },
 
 
+};
+
+module.exports = {
+  VoxBlock, VoxBlockSpace,
+  MA_N, MA_E, MA_U, MA_S, MA_W, MA_D,
+  MANHATTAN_LEFT_MAPPING
 };
