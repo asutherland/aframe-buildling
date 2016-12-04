@@ -2,8 +2,6 @@
  * Render the floor curves of all known WPSCPs as 2d lines along the floor.
  * This can be done immediately after the wall planning stage without running
  * object placement, wall rendering, or floor-and-ceiling linkage.
- *
- * TODO NEXT
  */
 function renderDebugFloorLineMesh(space) {
   var geometry = new THREE.Geometry();
@@ -30,8 +28,6 @@ function renderDebugFloorLineMesh(space) {
       }
     }
   }
-
-  console.log('from space', space, 'we made', geometry.vertices.length, 'vertices');
 
   return geometry;
 }

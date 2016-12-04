@@ -48,6 +48,7 @@ function planWalls(space) {
 
         face = face.nextFace;
       } while (face !== startFace);
+
       group2d.segments = group2d.segments.concat(curPlanner.planRun(faceRun));
     }
   }

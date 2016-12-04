@@ -7,6 +7,9 @@ var { planWalls } = require('./plan_walls');
 
 var { renderDebugFloorLineMesh } = require('./debug_renderer');
 
+var { placeObjects } = require('./place_objects');
+var { HoleCuttingRenderer } = require('./wall_renderers/hole_cutting');
+
 var coordinates = AFRAME.utils.coordinates;
 
 var coordParser = function (value) {
@@ -105,10 +108,10 @@ AFRAME.registerComponent('buildling', {
     },
     */
     hScale: {
-      default: 0.5
+      default: 0.6
     },
     vScale: {
-      default: 1
+      default: 0.8
     }
   },
 
@@ -131,13 +134,31 @@ AFRAME.registerComponent('buildling', {
     planFaces(blockSpace);
     planWalls(blockSpace);
 
-    var geometry = renderDebugFloorLineMesh(blockSpace);
+    var debugMode = false;
 
-    var material = new THREE.LineBasicMaterial({
-	      color: this.data.color
-    });
+    var geometry, material;
+    if (debugMode) {
+      geometry = renderDebugFloorLineMesh(blockSpace);
+      material = new THREE.LineBasicMaterial({
+  	      color: this.data.color
+      });
 
-    this.el.setObject3D('mesh', new THREE.Line(geometry, material));
+      this.el.setObject3D('mesh', new THREE.Line(geometry, material));
+    } else {
+      placeObjects(blockSpace);
+
+      var wallRenderer = new HoleCuttingRenderer(blockSpace);
+      geometry = wallRenderer.render();
+
+      material = new THREE.MeshStandardMaterial({
+        color: this.data.color,
+        wireframe: true
+      });
+
+      this.el.setObject3D('mesh', new THREE.Mesh(geometry, material));
+    }
+
+    console.log('rendered space:', blockSpace);
   },
 
   remove: function () {

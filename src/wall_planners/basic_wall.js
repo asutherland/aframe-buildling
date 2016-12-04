@@ -147,13 +147,18 @@ BasicWallPlanner.prototype = {
     var segPointRanges = [];
 
     var face, startFace;
+    var accumulateCurveLength = function(total, curve) {
+      return total + curve.getLength();
+    };
     var emitSegment = function() {
       var curSegment = {
         startFace: startFace,
         endFace: face,
+        length: segCurves.reduce(accumulateCurveLength, 0),
         floorCurves: segCurves,
         ceilingCurves: segCurves,
-        pointRanges: segPointRanges
+        pointRanges: segPointRanges,
+        objects: []
       };
       segments.push(curSegment);
       startFace = face;
