@@ -41,13 +41,20 @@ function WallGeometryHelper(space, geom) {
   this.curvePoints = 0;
   // our total distance along this curve.
   this.distAlongCurve = 0;
+  // The next distance along the curve to emit a set of vertices for this curve.
+  // We will step to the (relative) smaller of this and `nextObjStepDist`.
   this.nextCurveStepDist = 0;
 
+  // We are told about the object prior to stepping to it.  inObj is initially
+  // false and the `nextObjStepDist` is set to the start of the object.
+  this.inObj = false;
   this.obj = null;
   this.objLength = 0;
   this.distAlongObj = 0;
   this.iObjPoint = 0;
   this.objPoints = 0;
+  // The next distance along the object to emit a set of vertices.  We will step
+  // to the (relative) smaller of this and `nextCurveStepDist`.
   this.nextObjStepDist = 0;
 
   this.lastVerts = null;
@@ -77,7 +84,7 @@ WallGeometryHelper.prototype = {
     var ceilPoint = this.ceilingCurve.getPoint(this.distAlongCurve / this.curveLength);
     var ceilVert = new THREE.Vector3(ceilPoint.x, ceilY, ceilPoint.y);
 
-    var obj = this.obj;
+    var obj = this.inObj && this.obj;
     if (obj) {
       var cutBottomPoint = obj.bottomCurve.getPoint(this.distAlongObj / this.objLength);
       var cutTopPoint = obj.topCurve.getPoint(this.distAlongObj / this.objLength);
@@ -191,17 +198,8 @@ WallGeometryHelper.prototype = {
     while (this.distAlongSeg + EPSILON < target) {
       var targStep = target - this.distAlongSeg;
       var curveStep = this.nextCurveStepDist - this.distAlongCurve;
-      var objStep;
-      // XXX okay, this and the emitter needs to be specialized to understand
-      // if we're in the object yet or not.  I initially wrote this assuming
-      // we'd have advanced to the object start before applying the object.  But
-      // it is the case we want to know about the object to start its opening
-      // before advancing to that transition point.  In the case the object is
-      // not the cause of the immediate next step, then we need to make sure
-      // it's predicated.  We mainly want the object putting forth steps like:
-      // [start], [...all the steps called for by the object's count...], [end].
-      if (this.obj) {
 
+      if (this.obj) {
         objStep = this.nextObjStepDist - this.distAlongObj;
       } else {
         // arbitrary large value.  doesn't matter.
@@ -223,7 +221,16 @@ WallGeometryHelper.prototype = {
             this.curveLength * (this.iCurvePoint + 1) / (this.curvePoints - 1);
         }
       }
-      if (this.distAlongObj >= this.nextObjStepDist - EPSILON) {
+      if (!this.inObj) {
+        if (this.distAlongObj >= -EPSILON) {
+          this.inObj = true;
+          this.distAlongObj = 0;
+          this.iObjPoint = 0;
+          this.nextObjStepDist = this.objLength / (this.objPoints - 1);
+        } // otherwise we still didn't step to the object yet.
+      }
+      else if (this.distAlongObj >= this.nextObjStepDist - EPSILON) {
+        // (we were already in the object)
         this.iObjPoint++;
         this.nextObjStepDist =
           this.objLength * (this.iObjPoint + 1) / (this.objPoints - 1);
@@ -236,6 +243,8 @@ WallGeometryHelper.prototype = {
 
   /**
    * Tell us about a segment.  We will emit the vertical vertices for the start.
+   * This should be followed by calls for traverseCut for every (placed cut)
+   * object and finally finished with a call to endSegment.
    */
   startSegment: function(seg) {
     this.lastVerts = null;
@@ -245,6 +254,9 @@ WallGeometryHelper.prototype = {
     this._verticalCheckpoint();
   },
 
+  /**
+   * Initialize for curves[iCurve].
+   */
   _startSegmentCurve: function(iCurve) {
     this.floorCurve = this.seg.floorCurves[iCurve];
     this.ceilingCurve = this.seg.ceilingCurves[iCurve];
@@ -270,13 +282,21 @@ WallGeometryHelper.prototype = {
   traverseCut: function(obj) {
     this.obj = obj;
     this.objLength = obj.end - obj.start;
-    this.distAlongObj = 0;
-    this.iObjPoint = 0;
+    // this must be negative for correctness
+    this.distAlongObj = this.distAlongCurve - obj.start;
+    if (this.distAlongObj >= 0) {
+      throw new Error('attempting to traverse cut too late. distAlongObj: ' +
+        this.distAlongObj);
+    }
+    this.inObj = false;
     this.objPoints = obj.minPoints;
-    this.nextObjStepDist = this.objLength / (this.objPoints - 1);
+    this.iObjPoint = -1;
+    // we want to step to the start of the object
+    this.nextObjStepDist = 0;
 
     this._advanceToDist(obj.end);
     this.obj = null;
+    this.inObj = false;
   },
 
   endSegment: function(seg) {
@@ -312,6 +332,7 @@ HoleCuttingRenderer.prototype = {
       for (var iSeg = 0; iSeg < group2d.segments.length; iSeg++) {
         var seg = group2d.segments[iSeg];
 
+        console.log('rendering segment', seg);
         this._renderSegment(wgeom, seg);
       }
     }
