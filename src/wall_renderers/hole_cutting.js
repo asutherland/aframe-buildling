@@ -33,12 +33,14 @@ function WallGeometryHelper(space, geom) {
 
   // current curve in the segment
   this.iCurve = 0;
+  // Does this curve connect to another curve in our same segment?
+  this.internalCurve = false;
   // length of this curve (arc matters)
   this.curveLength = 0;
-  // [0, curvePoints] curve point index.
+  // [0, highCurveIndex] curve point index.
   this.iCurvePoint = 0;
-  // number of points we're emitting for this curve.
-  this.curvePoints = 0;
+  // One less than the number of curve points to emit.
+  this.highCurveIndex = 0;
   // our total distance along this curve.
   this.distAlongCurve = 0;
   // The next distance along the curve to emit a set of vertices for this curve.
@@ -50,8 +52,12 @@ function WallGeometryHelper(space, geom) {
   this.inObj = false;
   this.obj = null;
   this.objLength = 0;
+  // Distance along the object's length.  May be negative in cases where we
+  // haven't yet reached the start of the object.
   this.distAlongObj = 0;
+  // [0, objPoints] object point index.
   this.iObjPoint = 0;
+  // number of points we're emitting for this object
   this.objPoints = 0;
   // The next distance along the object to emit a set of vertices.  We will step
   // to the (relative) smaller of this and `nextCurveStepDist`.
@@ -168,7 +174,7 @@ WallGeometryHelper.prototype = {
   },
 
   _verticalCheckpoint: function() {
-    console.log('vert checkpoint');
+    //console.log('vert checkpoint');
     var verts = this._makeVerticalVertices();
     var vertIdxs = this._wrapVerticesToIndices(verts);
     if (this.lastVerts) {
@@ -178,7 +184,7 @@ WallGeometryHelper.prototype = {
       // avoid the duplicate emit at that point, in which case an assertion
       // that performs a checkpoint and asserts sameVerts might be appropriate.
       if (sameVerts(this.lastVerts, verts)) {
-        console.log('  same verts!');
+        //console.log('  same verts!');
         return;
       }
       this._emitFaces(this.lastVertIndices, vertIdxs);
@@ -206,29 +212,45 @@ WallGeometryHelper.prototype = {
         objStep = 10000;
       }
 
+      // - Pick smallest step.
       step = Math.min(targStep, curveStep, objStep);
-      console.log('distAlongSeg', this.distAlongSeg, 'step', step);
+
+      // - Step
       this.distAlongSeg += step;
       this.distAlongCurve += step;
-      this.distAlongObj += step;
+      if (this.obj) {
+        this.distAlongObj += step;
+      }
 
+      // - Curve stepping
+      // If curve step reached, set next step or advance to next curve.
       if (this.distAlongCurve >= this.nextCurveStepDist - EPSILON) {
         this.iCurvePoint++;
-        if (this.iCurvePoint > this.curvePoints) {
+        // If this is an internal curve and our next point is our last point, we
+        // want to jump to the start of the next curve because we require the
+        // points to be the same.
+        if (this.iCurvePoint + (this.internalCurve ? 1 : 0) > this.highCurveIndex) {
           this._startSegmentCurve(this.iCurve + 1);
         } else {
           this.nextCurveStepDist =
-            this.curveLength * (this.iCurvePoint + 1) / (this.curvePoints - 1);
+            this.curveLength * (this.iCurvePoint + 1) / this.highCurveIndex;
         }
       }
+
+      // - Object stepping
+      // If not in object, see if our step brought us to its start.
       if (!this.inObj) {
-        if (this.distAlongObj >= -EPSILON) {
+        if (this.obj && this.distAlongObj >= -EPSILON) {
           this.inObj = true;
           this.distAlongObj = 0;
           this.iObjPoint = 0;
           this.nextObjStepDist = this.objLength / (this.objPoints - 1);
         } // otherwise we still didn't step to the object yet.
       }
+      // In object, see if step reached, advance.  (We don't need to think about
+      // doing anything special when we reach the end of the object.  Our caller
+      // explicitly requested to advance to the end of the object and the loop
+      // will terminate at that point.)
       else if (this.distAlongObj >= this.nextObjStepDist - EPSILON) {
         // (we were already in the object)
         this.iObjPoint++;
@@ -238,7 +260,6 @@ WallGeometryHelper.prototype = {
 
       this._verticalCheckpoint();
     }
-    console.log('advanced', this.distAlongSeg, 'target', target, 'of', this.seg.length);
   },
 
   /**
@@ -262,11 +283,11 @@ WallGeometryHelper.prototype = {
     this.ceilingCurve = this.seg.ceilingCurves[iCurve];
 
     this.iCurve = iCurve;
+    this.internalCurve = iCurve < this.seg.floorCurves.length - 1;
     this.curveLength = this.floorCurve.getLength();
-    console.log('curve length:', this.curveLength);
     this.iCurvePoint = 0;
-    this.curvePoints = this.seg.pointRanges[iCurve * 2]; // just use min for now
-    this.nextCurveStepDist = this.curveLength / (this.curvePoints - 1);
+    this.highCurveIndex = this.seg.pointRanges[iCurve * 2] - 1; // just use min for now
+    this.nextCurveStepDist = this.curveLength / this.highCurveIndex;
     this.distAlongCurve = 0;
   },
 
@@ -332,13 +353,13 @@ HoleCuttingRenderer.prototype = {
       for (var iSeg = 0; iSeg < group2d.segments.length; iSeg++) {
         var seg = group2d.segments[iSeg];
 
-        console.log('rendering segment', seg);
+        //console.log('rendering segment', seg);
         this._renderSegment(wgeom, seg);
       }
     }
 
-    console.log('my geometry has', geometry.vertices.length, 'vertices!',
-                geometry.faces.length, 'faces!');
+    //console.log('my geometry has', geometry.vertices.length, 'vertices!',
+    //            geometry.faces.length, 'faces!');
 
     geometry.computeBoundingSphere();
     geometry.computeFaceNormals();
