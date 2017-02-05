@@ -14,13 +14,13 @@ var indexToRelManhattan = [
   { x: -1, y: 0, z: 0 }, // 4: west. (1+3)%6
   { x: 0, y: -1, z: 0 }, // 5: down. (2+3)%6
 ];
-var MANHATTAN_DIRS = 6;
-var MA_N = 0; // north
-var MA_E = 1; // east
-var MA_U = 2; // up
-var MA_S = 3; // south
-var MA_W = 4; // west
-var MA_D = 5; // down
+const MANHATTAN_DIRS = 6;
+const MA_N = 0; // north
+const MA_E = 1; // east
+const MA_U = 2; // up
+const MA_S = 3; // south
+const MA_W = 4; // west
+const MA_D = 5; // down
 
 /**
  * If we hang a left in this manhattan cardinal direction space, what's our new
@@ -285,26 +285,32 @@ VoxBlockSpace.prototype = {
       block.group3d = group3d;
       group3d.blocks.push(block);
       pending.push(
-        block.adjacentBlocks[0], block.adjacentBlocks[1],
-        block.adjacentBlocks[2], block.adjacentBlocks[3],
-        block.adjacentBlocks[4], block.adjacentBlocks[5]);
+        block.adjacentBlocks[MA_N], block.adjacentBlocks[MA_E],
+        block.adjacentBlocks[MA_U], block.adjacentBlocks[MA_S],
+        block.adjacentBlocks[MA_W], block.adjacentBlocks[MA_D]);
     }
   },
 
   _flood2dGroup: function(rootBlock, group2d) {
+    var groupY = group2d.y;
     rootBlock.group2d = group2d;
     group2d.blocks.push(rootBlock);
     // Invariant: any block with the group set has also had its adjacent blocks
     // pushed onto pending.  Therefore if we see a block with the group set,
     // we know we don't have anything to do.  Likewise, if the group has not
     // been set, we need to set and push its adjacents.
-    var pending = rootBlock.adjacentBlocks.concat();
+    var pending = [
+      rootBlock.adjacentBlocks[MA_N], rootBlock.adjacentBlocks[MA_E],
+      rootBlock.adjacentBlocks[MA_S], rootBlock.adjacentBlocks[MA_W]];
 
     while (pending.length) {
       var block = pending.pop();
       // to simplify logic, we may push nulls. skip them here.
       if (!block) {
         continue;
+      }
+      if (block.floorY !== groupY) {
+        throw new Error('somehow wandered off our floor?');
       }
       // per invariant above, nothing to do here.
       if (block.group2d) {
@@ -313,8 +319,8 @@ VoxBlockSpace.prototype = {
       block.group2d = group2d;
       group2d.blocks.push(block);
       pending.push(
-        block.adjacentBlocks[0], block.adjacentBlocks[1],
-        block.adjacentBlocks[3], block.adjacentBlocks[4]);
+        block.adjacentBlocks[MA_N], block.adjacentBlocks[MA_E],
+        block.adjacentBlocks[MA_S], block.adjacentBlocks[MA_W]);
     }
   },
 
@@ -338,7 +344,7 @@ VoxBlockSpace.prototype = {
       }
 
       if (!block.group2d) {
-        var group2d = this._newGroup2d(block.y);
+        var group2d = this._newGroup2d(block.floorY);
         this._flood2dGroup(block, group2d);
       }
     }

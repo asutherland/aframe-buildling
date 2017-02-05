@@ -15,8 +15,8 @@ function renderDebugFloorLineMesh(space) {
 
       for (var iCurve = 0; iCurve < seg.floorCurves.length; iCurve++) {
         var curve = seg.floorCurves[iCurve];
-        var minPoints = seg.pointRanges[iCurve*2];
-        var maxPoints = seg.pointRanges[iCurve*2 + 1];
+        var minPoints = seg.pointRanges[iCurve*2] + 2;
+        var maxPoints = seg.pointRanges[iCurve*2 + 1] + 2;
 
         var points = curve.getPoints(minPoints);
         for (var iPoint = 0; iPoint < points.length; iPoint++) {

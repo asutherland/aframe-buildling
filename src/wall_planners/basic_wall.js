@@ -200,7 +200,7 @@ BasicWallPlanner.prototype = {
       firstSeg.floorCurves = lastSeg.floorCurves.concat(firstSeg.floorCurves);
       firstSeg.ceilingCurves =
         lastSeg.ceilingCurves.concat(firstSeg.ceilingCurves);
-      // eh, leave pointRages the same.
+      firstSeg.pointRanges = [0, 0];
 
       // eat the now-moot last segment.
       segments.pop();

@@ -170,7 +170,7 @@ AFRAME.registerComponent('buildling', {
     planFaces(blockSpace);
     planWalls(blockSpace);
 
-    var debugMode = false;
+    var debugMode = true;
     var wireframeMode = true;
 
     console.log('rendering space:', blockSpace);
