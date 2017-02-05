@@ -5,7 +5,6 @@ var EPSILON = 0.00001;
  * and l2.v1 and are all part of the same infinite line.
  */
 function checkContinuousCollinearLines(l1, l2) {
-  console.log('comparing', l1.v2, l2.v1);
   // We're not doing epsilon checking for now because we expect the points to
   // have the same values as a result of identical computations, or possibly
   // even having them be the same objects.

@@ -53,7 +53,7 @@ function VoxFace(owningBlock, faceType) {
   // after floor slicing.
   this.prevFace = null;
   // Coming in from the previous face, was there a deflection off a block?
-  this.prevDeflected;
+  this.prevDeflected = false;
 
   /* TODO
   // Any matching face (same faceType) for the floor above us, may stay null.

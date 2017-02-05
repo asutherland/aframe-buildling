@@ -90,12 +90,32 @@ var pyramidHouseBlocks = asciiArtToBlockCoordMaps(
  ...|...| .
  ...| . |`);
 
+var officeBuildingBlocks = asciiArtToBlockCoordMaps(
+`.....|.....|.....|
+ .....|.....|.....| ...
+ .....|.....|.....| ...
+ .....|.....|.....| ...
+ .....|.....|.....|`);
+
+var BLOCK_TEMPLATES = {
+  pyramid: pyramidHouseBlocks,
+  office: officeBuildingBlocks
+};
+
+function maybeTemplateMaybeCoordsParser(str) {
+  if (str[0] !== '#') {
+    return coordParser(str);
+  }
+
+  return BLOCK_TEMPLATES[str.substring(1)] || pyramidHouseBlocks;
+}
+
 AFRAME.registerComponent('buildling', {
   schema: {
     color: { default: '#ccc' },
     blocks: {
       default: pyramidHouseBlocks,
-      parse: coordParser,
+      parse: maybeTemplateMaybeCoordsParser,
       stringify: coordStringifier,
     },
     /*
