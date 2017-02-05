@@ -312,10 +312,16 @@ WallGeometryHelper.prototype = {
    * Initialize for curves[iCurve].
    */
   _startSegmentCurve: function(iCurve) {
+    this.iCurve = iCurve;
+    // There may be no next curve; set distance appropriately.
+    if (iCurve >= this.seg.floorCurves.length) {
+      this.nextCurveStepDist = 10000;
+      return;
+    }
+
     this.floorCurve = this.seg.floorCurves[iCurve];
     this.ceilingCurve = this.seg.ceilingCurves[iCurve];
 
-    this.iCurve = iCurve;
     this.internalCurve = iCurve < this.seg.floorCurves.length - 1;
     this.curveLength = this.floorCurve.getLength();
     this.iCurvePoint = 0;
