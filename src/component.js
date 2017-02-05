@@ -135,6 +135,7 @@ AFRAME.registerComponent('buildling', {
     planWalls(blockSpace);
 
     var debugMode = false;
+    var wireframeMode = true;
 
     var geometry, material;
     if (debugMode) {
@@ -152,7 +153,7 @@ AFRAME.registerComponent('buildling', {
 
       material = new THREE.MeshStandardMaterial({
         color: this.data.color,
-        wireframe: true
+        wireframe: wireframeMode
       });
 
       this.el.setObject3D('mesh', new THREE.Mesh(geometry, material));

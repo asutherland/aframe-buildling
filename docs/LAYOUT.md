@@ -96,13 +96,16 @@ for a corner to consist of 2 plannable WPSCP's joined by a 3rd unplannable
 WPSCP.)
 
 In addition to the per block face floor and ceiling curves, we also have a
-per-block-face point range that expresses the minimum and maximum number of
-points that you might want to use to render the geometry.  For simple walls,
-this range can be [2, 2], but for curves a broader LoD range might be
-appropriate, and for specifying poly-line-type geometries a fixed number of
-points is also likely advisable.  We are thus able to render the walls into 3d
-space by sampling the floor and ceiling curves with join points at the edges of
-the face.
+per-block-face point range that expresses the minimum and maximum point density
+that you might want to use to render the geometry, not accounting for the
+inherent start/stop points.  For flat walls, this range can will likely be [0,
+0], but for curves a LoD range is appropriate.  Previously we tried to specify a
+fixed number of points to allow explicit polygonal behavior, but that assumes
+the geometry lines up directly with our sample points, and that's not likely to
+work out.  That's a fancy geometry thing that's not in the cards for this
+implementation generation.  We are then able to render the walls into 3d space
+by sampling the floor and ceiling curves with join points at the edges of the
+face.
 
 #### 4: Object Placement ####
 
@@ -142,7 +145,7 @@ placement range we're covering, and h is [0, 1] over the height of the wall.)
 
 #### 6: Floor and Ceiling Linkage (Hacks) ####
 
-Although sloped rooves are cool, they're also not trivial.  For now we do
+Although sloped roofs are cool, they're also not trivial.  For now we do
 the simplest thing which is that we generate floor and ceiling slabs for every
 building floor.  The mechanism is similar to wall generation.  For all faces we
 generate geometry connecting the ceiling curve to the "enclosed" portions of

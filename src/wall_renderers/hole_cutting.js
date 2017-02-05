@@ -19,6 +19,17 @@ function sameVerts(a, b) {
 
 /**
  * Segment-aware geometry helper.
+ *
+ * For geometry generation, we have 2 states:
+ * 1. We're in a stretch of wall without any cuts in it.  We sample along the
+ *    floor and ceiling curves and connect their equivalent t-parameters using
+ *    whatever point density is desired.
+ * 2. We're in a object cut.  The object's curves are what we sample over.
+ *    The resulting x-values are translated into appropriate t-parameters for
+ *    the floor and ceiling curves.  The point density is the max of what is
+ *    requested by the object and the floor/ceiling.
+ *
+ *
  */
 function WallGeometryHelper(space, geom) {
   this.space = space;
@@ -84,16 +95,37 @@ WallGeometryHelper.prototype = {
     var floorY = someBlock.floorY;
     var ceilY = someBlock.ceilY;
 
-    var floorPoint = this.floorCurve.getPoint(this.distAlongCurve / this.curveLength);
+    var obj = this.inObj && this.obj;
+
+    // The object cutter operates in a 2d space.  We map this space onto the
+    // 3d strip defined by linking floorCurve(t) and ceilingCurve(t) where the
+    // object cutter's x's become the t-parameter for their corresponding curve
+    // and the y is the distance along the line connecting floorCurve(bottomX)
+    // and floorCurve(topX).
+    var effectiveBottomDist = this.distAlongCurve;
+    var effectiveTopDist = this.distAlongCurve;
+    var cutBottomPoint, cutTopPoint;
+    if (obj) {
+      cutBottomPoint = obj.bottomCurve.getPoint(this.distAlongObj / this.objLength);
+      cutTopPoint = obj.topCurve.getPoint(this.distAlongObj / this.objLength);
+
+      // The 'x' exists in distAlongSeg-space.  The curve is being evaluated
+      // in its local distAlongCurve
+
+      var objLength = obj.end - obj.start;
+      effectiveBottomDist = this.curveLength * (cutBottomPoint.x + obj.start) / this.seg.length;
+      effectiveTopDist = this.curveLength * (cutTopPoint.x + obj.start) / this.seg.length;
+    }
+    console.log('actual dist', this.distAlongCurve, 'effective', effectiveBottomDist, effectiveTopDist)
+
+    var floorPoint = this.floorCurve.getPoint(effectiveBottomDist / this.curveLength);
     var floorVert = new THREE.Vector3(floorPoint.x, floorY, floorPoint.y);
 
-    var ceilPoint = this.ceilingCurve.getPoint(this.distAlongCurve / this.curveLength);
+    var ceilPoint = this.ceilingCurve.getPoint(effectiveTopDist / this.curveLength);
     var ceilVert = new THREE.Vector3(ceilPoint.x, ceilY, ceilPoint.y);
 
-    var obj = this.inObj && this.obj;
     if (obj) {
-      var cutBottomPoint = obj.bottomCurve.getPoint(this.distAlongObj / this.objLength);
-      var cutTopPoint = obj.topCurve.getPoint(this.distAlongObj / this.objLength);
+console.log('obj points', this.distAlongObj / this.objLength, cutBottomPoint, cutTopPoint);
 
       // for simplicity, we're pretending like t===x and only caring about the y
       // which we map onto the line between floorVert and ceilVert.
@@ -196,7 +228,8 @@ WallGeometryHelper.prototype = {
   /**
    * Advance along the current segment, emitting geometry as we go.  There are
    * three possible "steps" that we could take at any given point:
-   * - The step to the requested target.  This should be the end of
+   * - The step to the requested target, ending the loop after we process that
+   *   vertical checkpoint.
    * - The step to the next point to emit on the current curve.
    * - If there's an `obj`, the step to the next point on the obj.
    */
@@ -286,7 +319,7 @@ WallGeometryHelper.prototype = {
     this.internalCurve = iCurve < this.seg.floorCurves.length - 1;
     this.curveLength = this.floorCurve.getLength();
     this.iCurvePoint = 0;
-    this.highCurveIndex = this.seg.pointRanges[iCurve * 2] - 1; // just use min for now
+    this.highCurveIndex = this.seg.pointRanges[iCurve * 2] + 1; // just use min for now
     this.nextCurveStepDist = this.curveLength / this.highCurveIndex;
     this.distAlongCurve = 0;
   },
@@ -301,6 +334,7 @@ WallGeometryHelper.prototype = {
    *
    */
   traverseCut: function(obj) {
+    console.log('new obj', obj);
     this.obj = obj;
     this.objLength = obj.end - obj.start;
     // this must be negative for correctness

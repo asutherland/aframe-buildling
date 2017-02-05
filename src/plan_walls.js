@@ -24,7 +24,7 @@ function planWalls(space) {
         if (face.wallPlanner !== curPlanner) {
           // We found a different planner!  Have the preceding face be our
           // effective startFace.
-          startFace = face.prevFace;
+          startFace = face = face.prevFace;
           break;
         }
 

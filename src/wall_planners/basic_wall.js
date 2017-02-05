@@ -5,6 +5,8 @@ var {
   VFT_NW_CORN, VFT_N_CAPE, VFT_E_CAPE, VFT_S_CAPE, VFT_W_CAPE, VFT_ISLAND
 } = require('../floor_slicer');
 
+var { checkContinuousCollinearLines } = require('../geom_utils/collinear');
+
 /**
  *  For now just does right-angle walls.
  */
@@ -171,7 +173,7 @@ BasicWallPlanner.prototype = {
       var faceCurves = this._makeCurvesForFace(face);
 
       segCurves.push(faceCurves[0]);
-      segPointRanges.push(2, 2);
+      segPointRanges.push(0, 0);
       // Nothing special to do if this piece is continuous.
       if (faceCurves.length === 1) {
         continue;
@@ -181,10 +183,28 @@ BasicWallPlanner.prototype = {
         emitSegment();
         iCurve++;
         segCurves.push(faceCurves[iCurve]);
-        segPointRanges.push(2, 2);
+        segPointRanges.push(0, 0);
       }
     }
     emitSegment();
+
+    // - Join first and last segment if their vectors are parallel
+    var firstSeg = segments[0];
+    var firstSegLine = firstSeg.floorCurves[0];
+    var lastSeg = segments[segments.length - 1];
+    var lastSegLine = lastSeg.floorCurves[lastSeg.floorCurves.length - 1];
+
+    if (checkContinuousCollinearLines(lastSegLine, firstSegLine)) {
+      firstSeg.startFace = lastSeg.startFace;
+      firstSeg.length += lastSeg.length;
+      firstSeg.floorCurves = lastSeg.floorCurves.concat(firstSeg.floorCurves);
+      firstSeg.ceilingCurves =
+        lastSeg.ceilingCurves.concat(firstSeg.ceilingCurves);
+      // eh, leave pointRages the same.
+
+      // eat the now-moot last segment.
+      segments.pop();
+    }
 
     return segments;
   }
