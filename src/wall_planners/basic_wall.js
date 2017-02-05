@@ -206,6 +206,26 @@ BasicWallPlanner.prototype = {
       segments.pop();
     }
 
+    // - Simplify segment curves
+    for (var iSeg = 0; iSeg < segments.length; iSeg++) {
+      var segment = segments[iSeg];
+
+      if (segment.floorCurves.length > 1) {
+        segment.floorCurves = [
+          new THREE.LineCurve(
+            segment.floorCurves[0].v1,
+            segment.floorCurves[segment.floorCurves.length - 1].v2)
+        ];
+      }
+      if (segment.ceilingCurves.length > 1) {
+        segment.ceilingCurves = [
+          new THREE.LineCurve(
+            segment.ceilingCurves[0].v1,
+            segment.ceilingCurves[segment.ceilingCurves.length - 1].v2)
+        ];
+      }
+    }
+
     return segments;
   }
 };
