@@ -116,7 +116,7 @@ WallGeometryHelper.prototype = {
       effectiveBottomDist = this.curveLength * (cutBottomPoint.x + obj.start) / this.seg.length;
       effectiveTopDist = this.curveLength * (cutTopPoint.x + obj.start) / this.seg.length;
     }
-    console.log('actual dist', this.distAlongCurve, 'effective', effectiveBottomDist, effectiveTopDist)
+    //console.log('actual dist', this.distAlongCurve, 'effective', effectiveBottomDist, effectiveTopDist)
 
     var floorPoint = this.floorCurve.getPoint(effectiveBottomDist / this.curveLength);
     var floorVert = new THREE.Vector3(floorPoint.x, floorY, floorPoint.y);
@@ -125,7 +125,7 @@ WallGeometryHelper.prototype = {
     var ceilVert = new THREE.Vector3(ceilPoint.x, ceilY, ceilPoint.y);
 
     if (obj) {
-console.log('obj points', this.distAlongObj / this.objLength, cutBottomPoint, cutTopPoint);
+//console.log('obj points', this.distAlongObj / this.objLength, cutBottomPoint, cutTopPoint);
 
       // for simplicity, we're pretending like t===x and only caring about the y
       // which we map onto the line between floorVert and ceilVert.
@@ -334,7 +334,7 @@ console.log('obj points', this.distAlongObj / this.objLength, cutBottomPoint, cu
    *
    */
   traverseCut: function(obj) {
-    console.log('new obj', obj);
+    //console.log('new obj', obj);
     this.obj = obj;
     this.objLength = obj.end - obj.start;
     // this must be negative for correctness

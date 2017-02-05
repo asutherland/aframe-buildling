@@ -97,12 +97,23 @@ var officeBuildingBlocks = asciiArtToBlockCoordMaps(
  .....|.....|.....| ...
  .....|.....|.....|`);
 
+var skybridgeBuildingBlocks = asciiArtToBlockCoordMaps(
+`.....   .....|.....   .....|.....   .....|.....   .....|.....   .....
+ .....   .....|.....   .....|.....   .....|.....   .....|.....   .....
+ .....   .....|.....   .....|.....   .....|.....   .....|.............
+ .....   .....|.....   .....|.....   .....|.....   .....|.....   .....
+ .....   .....|.....   .....|.....   .....|.....   .....|.....   .....`);
+
 var BLOCK_TEMPLATES = {
   pyramid: pyramidHouseBlocks,
-  office: officeBuildingBlocks
+  office: officeBuildingBlocks,
+  skybridge: skybridgeBuildingBlocks
 };
 
 function maybeTemplateMaybeCoordsParser(str) {
+  if (!str) {
+    return null;
+  }
   if (str[0] !== '#') {
     return coordParser(str);
   }
@@ -112,9 +123,10 @@ function maybeTemplateMaybeCoordsParser(str) {
 
 AFRAME.registerComponent('buildling', {
   schema: {
+    name: { default: 'anon'},
     color: { default: '#ccc' },
     blocks: {
-      default: pyramidHouseBlocks,
+      default: null,
       parse: maybeTemplateMaybeCoordsParser,
       stringify: coordStringifier,
     },
@@ -140,10 +152,14 @@ AFRAME.registerComponent('buildling', {
   },
 
   update: function () {
+    if (!this.data.blocks) {
+      return;
+    }
+
     var hUnit = this.data.hScale;// / 5;
     var vUnit = this.data.vScale;// / 10;
 
-    var blockSpace = new VoxBlockSpace(hUnit, vUnit);
+    var blockSpace = new VoxBlockSpace(hUnit, vUnit, this.data.name);
     this.data.blocks.forEach(function(coord) {
       blockSpace.getOrCreateBlock(coord);
     });
@@ -156,6 +172,8 @@ AFRAME.registerComponent('buildling', {
 
     var debugMode = false;
     var wireframeMode = true;
+
+    console.log('rendering space:', blockSpace);
 
     var geometry, material;
     if (debugMode) {
@@ -178,8 +196,6 @@ AFRAME.registerComponent('buildling', {
 
       this.el.setObject3D('mesh', new THREE.Mesh(geometry, material));
     }
-
-    console.log('rendered space:', blockSpace);
   },
 
   remove: function () {
@@ -196,6 +212,7 @@ AFRAME.registerPrimitive('a-buildling', {
   },
 
   mappings: {
+    name: 'buildling.name',
     color: 'buildling.color',
     blocks: 'buildling.blocks',
     hScale: 'buildling.hScale',

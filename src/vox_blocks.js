@@ -164,7 +164,9 @@ Group2d.prototype = {
  * All implementation choices assume we're being used for a reasonably small
  * number of blocks that are largely connected.
  */
-function VoxBlockSpace(hUnit, vUnit) {
+function VoxBlockSpace(hUnit, vUnit, name) {
+  this.name = name;
+
   /**
    * A mapping from coordinate-triple string to VoxBlock instance.  While
    * simplistic, our needs are simple too.
