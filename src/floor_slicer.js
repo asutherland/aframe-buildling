@@ -2,7 +2,7 @@
  * See docs/LAYOUT.md for context.
  **/
 
-var { MA_N, MA_E, MA_U, MA_S, MA_W, MA_D, MANHATTAN_LEFT_MAPPING } =
+const { MA_N, MA_E, MA_U, MA_S, MA_W, MA_D, MANHATTAN_LEFT_MAPPING } =
   require('./vox_blocks');
 
 /**
@@ -25,20 +25,20 @@ var { MA_N, MA_E, MA_U, MA_S, MA_W, MA_D, MANHATTAN_LEFT_MAPPING } =
  * will need to potentially do something like that in the future, the current
  * deflection flags are good-ish enough.
  */
-var VFT_N = 0; // connect west and east block sides facing north.
-var VFT_NE_CORN = 1; // connect west and south block sides facing NE.
-var VFT_E = 2; // connect north and south block sides facing east.
-var VFT_SE_CORN = 3; // connect north and west block sides facing SE.
-var VFT_S = 4; // connect east and west block sides facing south.
-var VFT_SW_CORN = 5; // connect east and north block sides facing SW.
-var VFT_W = 6; // connect south and north block sides facing west.
-var VFT_NW_CORN = 7; // connect south and east block sides facing NW.
-var VFT_N_CAPE = 8; // connect south and south facing north.
-var VFT_E_CAPE = 9;
-var VFT_S_CAPE = 10;
-var VFT_W_CAPE = 11;
-var VFT_ISLAND = 12;
-var VFT_COUNT = 13;
+const VFT_N = 0; // connect west and east block sides facing north.
+const VFT_NE_CORN = 1; // connect west and south block sides facing NE.
+const VFT_E = 2; // connect north and south block sides facing east.
+const VFT_SE_CORN = 3; // connect north and west block sides facing SE.
+const VFT_S = 4; // connect east and west block sides facing south.
+const VFT_SW_CORN = 5; // connect east and north block sides facing SW.
+const VFT_W = 6; // connect south and north block sides facing west.
+const VFT_NW_CORN = 7; // connect south and east block sides facing NW.
+const VFT_N_CAPE = 8; // connect south and south facing north.
+const VFT_E_CAPE = 9;
+const VFT_S_CAPE = 10;
+const VFT_W_CAPE = 11;
+const VFT_ISLAND = 12;
+const VFT_COUNT = 13;
 
 function VoxFace(owningBlock, faceType) {
   this.block = owningBlock;
@@ -82,7 +82,7 @@ VoxFace.prototype = {
  * Do not change the ordering of the E/W N/S pairs without updating
  * `_linkVoxFace`.
  */
-var ADJ_TO_VFT_MAPPING = [
+const ADJ_TO_VFT_MAPPING = [
   [VFT_ISLAND], // nothing adjacent! island!
   [VFT_S_CAPE], // 1: just to the north, southern cape!
   [VFT_W_CAPE], // 2: just to the east, western cape
@@ -102,18 +102,18 @@ var ADJ_TO_VFT_MAPPING = [
 ];
 
 // see VFT_CLOCKWISE_ENTRY_FACE_INDEX_MAPPING
-var NE_ENTRY = 0;
-var SE_ENTRY = 1;
-var SW_ENTRY = 2;
-var NW_ENTRY = 3;
-var SELF_LOOP = 4;
+const NE_ENTRY = 0;
+const SE_ENTRY = 1;
+const SW_ENTRY = 2;
+const NW_ENTRY = 3;
+const SELF_LOOP = 4;
 
 /**
  * Maps from VoxFace type to the corner of entry into the next/adjacent block
  * from that block's perspective.  If there's a "deflection", then you need
  * to further map the entry through CLOCKWISE_ENTRY_CORNER_DEFLECT_ROTATE.
  */
-var VFT_CLOCKWISE_ENTRY_FACE_INDEX_MAPPING = [
+const VFT_CLOCKWISE_ENTRY_FACE_INDEX_MAPPING = [
   // cardinal + corners
   NW_ENTRY, // N enters from the west to the north
   NE_ENTRY, // NE corner enters from the north to the east
@@ -138,14 +138,14 @@ var VFT_CLOCKWISE_ENTRY_FACE_INDEX_MAPPING = [
  * mappings that need to exist because of our value-space (ex: MA_U/MA_D), this
  * could be accomplished with math.
  */
-var CLOCKWISE_ENTRY_CORNER_DEFLECT_ROTATE = [
+const CLOCKWISE_ENTRY_CORNER_DEFLECT_ROTATE = [
   NW_ENTRY, // Our NE is our eastern neighbor's NW (0 => 3)
   NE_ENTRY, // Our SE is our southern neighbor's NE (1 => 0)
   SE_ENTRY, // Our SW is our western neighbor's SE (2 => 1)
   SW_ENTRY, // our NW is our norther neighbor's SW (3 => 2)
 ]
 
-var VFT_CLOCKWISE_EXIT_DIR_MAPPING = [
+const VFT_CLOCKWISE_EXIT_DIR_MAPPING = [
   // cardinal + corners
   MA_E, // N exits east
   MA_S, // NE corner exits south
@@ -187,10 +187,10 @@ FloorSlicer.prototype = {
   _createFacesForBlock: function(block) {
     // north (1), east (2), south (4), west (8)
     var adjacencyBits = (
-     (block.adjacentBlocks[0] ? 1 : 0) |
-     (block.adjacentBlocks[1] ? 2 : 0) |
-     (block.adjacentBlocks[3] ? 4 : 0) |
-     (block.adjacentBlocks[4] ? 8 : 0));
+     (block.adjacentBlocks[MA_N] ? 1 : 0) |
+     (block.adjacentBlocks[MA_E] ? 2 : 0) |
+     (block.adjacentBlocks[MA_S] ? 4 : 0) |
+     (block.adjacentBlocks[MA_W] ? 8 : 0));
 
     var faceTypes = ADJ_TO_VFT_MAPPING[adjacencyBits];
     if (!faceTypes) {
